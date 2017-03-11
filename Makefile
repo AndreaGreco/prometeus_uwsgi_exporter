@@ -1,9 +1,6 @@
-TARGET=prometheus_bot
-
+TARGET=uWSGI_expoter
 
 all: main.go
 	go build -o $(TARGET)
-test:
-	bash t/curl.t
 clean:
 	rm $(TARGET)
