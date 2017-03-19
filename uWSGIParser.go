@@ -140,10 +140,9 @@ func uWSGI_DataFormat(data Uwsgi_json_t, domain string)string {
     StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\"} %d\r\n",uwsgi_prefix, "general_signal_queue",domain, data.SignalQueue))
     StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\"} %d\r\n",uwsgi_prefix, "general_load",domain, data.Load))
 
-    StrBuilder.WriteString("\r\n# HELP uWSGI looks\r\n")
     for _, arr := range(data.Locks) {
+        StrBuilder.WriteString("\r\n# HELP uWSGI looks\r\n")
         for key, val := range(arr) {
-
             StrBuilder.Write([]byte (fmt.Sprintf("%s%s_%s{domain=\"%s\"} %d\r\n", uwsgi_prefix, "locks",domain, SanitizeField(key), val)))
         }
     }
