@@ -99,7 +99,7 @@ func OpenUnixFD(FullPath string, Domain string) error {
         }
 
         Active_FD[Domain] = c
-        log.Println("[INFO  ] Insert %s, domain:%s to polling list", FullPath, Domain)
+        log.Printf("[INFO  ] Insert %s, domain:%s to polling list\r\n", FullPath, Domain)
         return nil
     }
 

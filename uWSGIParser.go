@@ -255,8 +255,10 @@ func ProvideJsonTextFromUnixSoket(fd net.Conn)[]byte {
  * @brief make reading of all stast soket
  */
 func ReadStatsSoket_uWSGI (Active_FD *map[string] net.Conn) {
-    jsonResponses := make(chan string)
+    queue := make(chan string, 1)
     var wg sync.WaitGroup
+
+    fmt.Printf("[DEBUG  ] Map len:%d\r\n", len(*Active_FD))
 
     wg.Add(len(*Active_FD))
     for Domain, CurrentFD := range *Active_FD {
@@ -265,18 +267,19 @@ func ReadStatsSoket_uWSGI (Active_FD *map[string] net.Conn) {
 
             text := ProvideJsonTextFromUnixSoket(CurrentFD)
             json.Unmarshal(text, Curret_uWSGI_Data)
-            jsonResponses <- uWSGI_DataFormat(*Curret_uWSGI_Data, CurretDomain)
-
-            wg.Done()
+            queue <- uWSGI_DataFormat(*Curret_uWSGI_Data, CurretDomain)
         } (CurrentFD, Domain)
     }
 
     // Recive data from channel
     go func() {
-        for response := range jsonResponses {
+        fmt.Printf("Passo")
+        for response := range queue {
             fmt.Println(response)
+            wg.Done()
         }
     }()
+
     wg.Wait()
 }
 
