@@ -11,6 +11,8 @@ import (
 	// "github.com/gin-gonic/gin/binding"
 	// "github.com/go-telegram-bot-api/telegram-bot-api"
 	"gopkg.in/yaml.v2"
+    "time"
+    "fmt"
     "net"
 )
 
@@ -23,6 +25,18 @@ type Config_t struct {
 	Port int `yaml:"port"`
 	SoketDir string `yaml:"soket_dir"`
 	StatsSokets []StatsSoketConf_t `yaml:"stats_sokets"`
+}
+
+/**
+ * @brief Current file is not unix soket
+ */
+type NoUnixSoketError struct {
+	When time.Time
+	What string
+}
+
+func (e NoUnixSoketError) Error() string {
+	return fmt.Sprintf("%v: %v", e.When, e.What)
 }
 
 /**
@@ -39,8 +53,6 @@ var Conf Config_t
  * @brief Map with active file descriptor
  */
 var Active_FD map[string]net.Conn
-
-
 
 /**
  * @brief Parse yaml config passed as flag parameter
@@ -72,14 +84,31 @@ func GET_Handling(c *gin.Context) {
  * @brief Open Unix soket and push it to UnixSoket fd map
  */
 func OpenUnixFD(FullPath string, Domain string) error {
-    c,err := net.Dial("unix",FullPath)
+    fi,err := os.Stat(FullPath)
+
     if err != nil {
-        log.Printf("[Error] Impossible open UnixSoket %s\r\n", FullPath)
         return err
     }
-    Active_FD[Domain] = c
-    log.Println("[INFO] Insert %s, domain:%s to polling list", FullPath, Domain)
-    return nil
+
+    if fi.Mode() & os.ModeSocket != 0 {
+
+        c,err := net.Dial("unix", FullPath)
+        if err != nil {
+            log.Printf("[ERROR] Impossible open UnixSoket %s\r\n", FullPath)
+            return err
+        }
+
+        Active_FD[Domain] = c
+        log.Println("[INFO  ] Insert %s, domain:%s to polling list", FullPath, Domain)
+        return nil
+    }
+
+    /** Else return Error, this file is not unix soket */
+    log.Printf("[ERROR] %s is not a Unix Soket SKIPPED\r\n",FullPath)
+    return NoUnixSoketError {
+        time.Now(),
+        fmt.Sprintf("%s is not a Unix Soket",FullPath),
+    }
 }
 
 /**
@@ -87,7 +116,7 @@ func OpenUnixFD(FullPath string, Domain string) error {
  */
 func CloseUnixFD(Domain string) {
     delete(Active_FD,Domain)
-    log.Println("[INFO] Removed %s from polling list", Domain)
+    log.Println("[INFO  ] Removed %s from polling list", Domain)
 }
 
 /**
@@ -99,7 +128,7 @@ func ValidateConfig () {
     // Alloc File descriptor map
     Active_FD = make(map[string]net.Conn)
 
-    log.Println("[INFO] Start check configuration file")
+    log.Println("[INFO  ] Start check configuration file")
 
     _,err := ioutil.ReadDir(Conf.SoketDir)
     // Calculate full path
@@ -124,24 +153,20 @@ func ValidateConfig () {
             continue
             } else {
                 log.Fatalf("[FATAL] %v\r\n", err)
-                // Close here
             }
 
-            // Let open File descriptor, check error
-
-            err = OpenUnixFD(FullPath, SoketPath.Domain)
-
-            err = OpenUnixFD(FullPath, SoketPath.Domain)
-            if err != nil {
-                FoundError = true
-            }
+        }
+        // Let open File descriptor, check error
+        err = OpenUnixFD(FullPath, SoketPath.Domain)
+        if err != nil {
+            FoundError = true
         }
     }
 
     if !FoundError {
-        log.Println("[INFO] Configuration correct, no error detect")
+        log.Println("[INFO  ] Configuration correct, no error detect")
     }else {
-        log.Println("[INFO] Error found check log")
+        log.Println("[INFO  ] Error found check log")
     }
 }
 
