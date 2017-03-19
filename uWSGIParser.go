@@ -244,16 +244,20 @@ func ProvideJsonTextFile(path string) []byte {
 /**
  * @brief Get json text from Unix Soket
  */
-func ProvideJsonTextFromUnixSoket(fd net.Conn)[]byte {
-    buf := make([]byte, 1024*128)
-    fd.Read(buf)
-    return buf
+func ProvideJsonTextFromUnixSoket(fd net.Conn) ([]byte,error) {
+    buf := make([]byte, 1024*16)
+    nbyte,err := fd.Read(buf)
+    if err != nil {
+        return nil,err
+    }
+    return buf[:nbyte],nil
 }
 
 /**
  * @brief make reading of all stast soket
  */
-func ReadStatsSoket_uWSGI (Active_FD *map[string] net.Conn) {
+func ReadStatsSoket_uWSGI (Active_FD *map[string] net.Conn) error {
+    var AllMetrics bytes.Buffer
     queue := make(chan string, 1)
     var wg sync.WaitGroup
 
@@ -264,21 +268,33 @@ func ReadStatsSoket_uWSGI (Active_FD *map[string] net.Conn) {
         go func(fd net.Conn, CurretDomain string) {
             Curret_uWSGI_Data := new(Uwsgi_json_t)
 
-            text := ProvideJsonTextFromUnixSoket(CurrentFD)
-            json.Unmarshal(text, Curret_uWSGI_Data)
+            text,err := ProvideJsonTextFromUnixSoket(CurrentFD)
+            if err != nil{
+                log.Printf("[ERROR] Cannot read soket:%v", err)
+                wg.Done()
+                return err
+            }
+
+            err = json.Unmarshal(text, Curret_uWSGI_Data)
+            if err!= nil{
+                log.Printf("[ERROR] Cannol Unmarshal json:%v", err)
+                wg.Done()
+                return err
+            }
             queue <- uWSGI_DataFormat(*Curret_uWSGI_Data, CurretDomain)
         } (CurrentFD, Domain)
     }
 
     // Recive data from channel
     go func() {
-        fmt.Printf("Passo")
         for response := range queue {
-            fmt.Println(response)
+            AllMetrics.WriteString(response)
             wg.Done()
         }
     }()
 
     wg.Wait()
+    fmt.Println(AllMetrics.String())
+    return nil
 }
 
