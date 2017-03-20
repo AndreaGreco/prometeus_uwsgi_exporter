@@ -143,8 +143,9 @@ func main() {
     // Is here for debug reason
 
     /* Enable here for reactivate GIN */
-	 router := gin.Default()
-     router.GET("/metrics", GET_Handling)
-     router.Run(fmt.Sprintf(":%d", Conf.Port))
+    gin.SetMode(gin.ReleaseMode)
+	router := gin.Default()
+    router.GET("/metrics", GET_Handling)
+    router.Run(fmt.Sprintf(":%d", Conf.Port))
 }
 
