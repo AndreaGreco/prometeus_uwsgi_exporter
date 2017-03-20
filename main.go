@@ -11,9 +11,9 @@ import (
 	// "github.com/gin-gonic/gin/binding"
 	// "github.com/go-telegram-bot-api/telegram-bot-api"
 	"gopkg.in/yaml.v2"
-    "time"
+ //   "time"
     "fmt"
-    "net"
+ //   "net"
 )
 
 type StatsSoketConf_t struct {
@@ -27,17 +27,11 @@ type Config_t struct {
 	StatsSokets []StatsSoketConf_t `yaml:"stats_sokets"`
 }
 
-/**
- * @brief Current file is not unix soket
- */
-type NoUnixSoketError struct {
-	When time.Time
-	What string
-}
 
-func (e NoUnixSoketError) Error() string {
-	return fmt.Sprintf("%v: %v", e.When, e.What)
-}
+/**
+ * @brief map domain, full path
+ */
+var FileMap map[string] string
 
 /**
   * @brief Flag config
@@ -50,13 +44,8 @@ var config_path = flag.String("c", "config.yaml", "Path to a config file")
 var Conf Config_t
 
 /**
- * @brief Map with active file descriptor
- */
-var Active_FD map[string]net.Conn
-
-/**
  * @brief Parse yaml config passed as flag parameter
- *
+ * @return False if found error
  */
 func ParseConfig () {
 
@@ -73,50 +62,41 @@ func ParseConfig () {
 }
 
 /**
+ * @brief Check if unix soket exist, and if file is Unix Soket
+ * 
+ */
+func CheckUnixSoket(FullPath string) bool {
+    FoundError := false
+
+    // Check path exist
+    _,err := os.Stat(FullPath)
+    if err != nil {
+        if os.IsNotExist(err) {
+            /* Error is not fatal, soket could be removed, uWSGI restared, Then log it, and continue */
+            log.Printf("[ERROR] Could not open %s\r\nThis error is not critical will be SKIP", FullPath)
+            FoundError = true
+        } else {
+            log.Fatalf("[FATAL] %v\r\n", err)
+        }
+    }
+    // Let open File descriptor, check error
+    if err != nil {
+        FoundError = true
+    }
+    return FoundError
+}
+
+/**
  * @brief callback handler GET request
  */
 func GET_Handling(c *gin.Context) {
-	c.String(http.StatusOK, "Get")
+    str := ReadStatsSoket_uWSGI()
+    if str == "" {
+        c.String(http.StatusInternalServerError,"")
+    }
+
+	c.String(http.StatusOK, str)
     return
-}
-
-/**
- * @brief Open Unix soket and push it to UnixSoket fd map
- */
-func OpenUnixFD(FullPath string, Domain string) error {
-    fi,err := os.Stat(FullPath)
-
-    if err != nil {
-        return err
-    }
-
-    if fi.Mode() & os.ModeSocket != 0 {
-
-        c,err := net.Dial("unix", FullPath)
-        if err != nil {
-            log.Printf("[ERROR] Impossible open UnixSoket %s\r\n", FullPath)
-            return err
-        }
-
-        Active_FD[Domain] = c
-        log.Printf("[INFO  ] Insert %s, domain:%s to polling list\r\n", FullPath, Domain)
-        return nil
-    }
-
-    /** Else return Error, this file is not unix soket */
-    log.Printf("[ERROR] %s is not a Unix Soket SKIPPED\r\n",FullPath)
-    return NoUnixSoketError {
-        time.Now(),
-        fmt.Sprintf("%s is not a Unix Soket",FullPath),
-    }
-}
-
-/**
- * @brief Close broken FD
- */
-func CloseUnixFD(Domain string) {
-    delete(Active_FD,Domain)
-    log.Println("[INFO  ] Removed %s from polling list", Domain)
 }
 
 /**
@@ -124,10 +104,7 @@ func CloseUnixFD(Domain string) {
  */
 func ValidateConfig () {
     FoundError := false
-
-    // Alloc File descriptor map
-    Active_FD = make(map[string]net.Conn)
-
+    FileMap = make(map[string] string)
     log.Println("[INFO  ] Start check configuration file")
 
     _,err := ioutil.ReadDir(Conf.SoketDir)
@@ -139,28 +116,14 @@ func ValidateConfig () {
 
     // Check path fist start polling
     for _, SoketPath := range(Conf.StatsSokets) {
-
         // Calculate full path
         FullPath := path.Join(Conf.SoketDir, SoketPath.Soket)
 
-        // Check path exist
-        _,err := os.Stat(FullPath)
-        if err != nil {
-           if os.IsNotExist(err) {
-           /* Error is not fatal, soket could be removed, uWSGI restared, Then log it, and continue */
-            log.Printf("[ERROR] Could not open %s\r\nThis error is not critical will be SKIP", FullPath)
+        if CheckUnixSoket(FullPath) {
             FoundError = true
-            continue
-            } else {
-                log.Fatalf("[FATAL] %v\r\n", err)
-            }
+        }
 
-        }
-        // Let open File descriptor, check error
-        err = OpenUnixFD(FullPath, SoketPath.Domain)
-        if err != nil {
-            FoundError = true
-        }
+        FileMap[SoketPath.Domain] = FullPath
     }
 
     if !FoundError {
@@ -178,12 +141,10 @@ func main() {
     // End init
 
     // Is here for debug reason
-    ReadStatsSoket_uWSGI(&Active_FD)
 
-    /* Enable here for reactivate GIN 
+    /* Enable here for reactivate GIN */
 	 router := gin.Default()
      router.GET("/metrics", GET_Handling)
-     router.Run(fmt.Sprintf(":%s", Conf.Port))
-     */
+     router.Run(fmt.Sprintf(":%d", Conf.Port))
 }
 

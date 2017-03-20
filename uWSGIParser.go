@@ -244,45 +244,55 @@ func ProvideJsonTextFile(path string) []byte {
 /**
  * @brief Get json text from Unix Soket
  */
-func ProvideJsonTextFromUnixSoket(fd net.Conn) ([]byte,error) {
-    buf := make([]byte, 1024*16)
-    nbyte,err := fd.Read(buf)
-    if err != nil {
+func ProvideJsonTextFromUnixSoket(FullPath string) ([]byte,error) {
+    if CheckUnixSoket(FullPath) {
+        log.Printf("[ERROR] Impossible open UnixSoket %s\r\n", FullPath)
+        return nil,nil
+    }
+
+    c,err := net.Dial("unix", FullPath)
+     if err != nil {
         return nil,err
     }
+
+    buf := make([]byte, 1024*16)
+    nbyte,err := c.Read(buf)
+    c.Close()
     return buf[:nbyte],nil
 }
+
 
 /**
  * @brief make reading of all stast soket
  */
-func ReadStatsSoket_uWSGI (Active_FD *map[string] net.Conn) error {
+func ReadStatsSoket_uWSGI () string {
     var AllMetrics bytes.Buffer
     queue := make(chan string, 1)
     var wg sync.WaitGroup
 
-    fmt.Printf("[DEBUG  ] Map len:%d\r\n", len(*Active_FD))
+    fmt.Printf("[DEBUG  ] Map len:%d\r\n", len(FileMap))
 
-    wg.Add(len(*Active_FD))
-    for Domain, CurrentFD := range *Active_FD {
-        go func(fd net.Conn, CurretDomain string) {
+    wg.Add(len(FileMap))
+    for Domain, FullPath := range FileMap {
+
+        go func(FullPath string, CurretDomain string) {
             Curret_uWSGI_Data := new(Uwsgi_json_t)
 
-            text,err := ProvideJsonTextFromUnixSoket(CurrentFD)
+            text,err := ProvideJsonTextFromUnixSoket(FullPath)
             if err != nil{
                 log.Printf("[ERROR] Cannot read soket:%v", err)
                 wg.Done()
-                return err
+                return
             }
 
             err = json.Unmarshal(text, Curret_uWSGI_Data)
             if err!= nil{
                 log.Printf("[ERROR] Cannol Unmarshal json:%v", err)
                 wg.Done()
-                return err
+                return
             }
             queue <- uWSGI_DataFormat(*Curret_uWSGI_Data, CurretDomain)
-        } (CurrentFD, Domain)
+        } (FullPath, Domain)
     }
 
     // Recive data from channel
@@ -292,9 +302,7 @@ func ReadStatsSoket_uWSGI (Active_FD *map[string] net.Conn) error {
             wg.Done()
         }
     }()
-
     wg.Wait()
-    fmt.Println(AllMetrics.String())
-    return nil
+    return AllMetrics.String()
 }
 
