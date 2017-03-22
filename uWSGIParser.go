@@ -107,124 +107,252 @@ const (
     idle
 )
 
+/**
+ * String buffer
+ */
+var StrBuilder bytes.Buffer
+
+var globalDisableHelp bool
+
+func EnableHelp() {
+    globalDisableHelp = true
+}
 
 
 /**
+ * @brief uwsgi prefix string
+ * string on head to all uwsgi prometheus metrics
+ */
+const uwsgi_prefix = "uwsgi_"
+
+/**
  * @brief Sanitizze string
- * 
+ *
  * Remove:
  * -    " " --> "_"
  */
 func SanitizeField (val string) string {
     ret := strings.Replace(val," ","_",-1)
-    ret = strings.ToLower(val)
+    ret = strings.ToLower(ret)
     return ret
+}
+
+
+/**
+ * @brief Write help string in string buffer
+ */
+func WriteHelp(str string, write bool) {
+    if write && globalDisableHelp {
+        StrBuilder.WriteString(str)
+    }
+}
+
+/**
+ * @brief Write metrics in string buffer
+ */
+func WriteMetrics(metrics string){
+    StrBuilder.WriteString(metrics)
 }
 
 /**
  * @brief Take uwsgi json struct and
  */
 func uWSGI_DataFormat(data Uwsgi_json_t, domain string)string {
+
+    StrBuilder.Reset()
+
     /**
      * Try respect prometheus line guide for write expoter:
      * https://prometheus.io/docs/practices/naming/
      */
-    var StrBuilder bytes.Buffer
-    const uwsgi_prefix = "uwsgi_"
+    txt := "general_listen_queue"
+    WriteHelp(fmt.Sprintf("# HELP %s%s Length of uwsgi listen queue\n", uwsgi_prefix, txt), true)
+    WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, txt, domain, data.ListenQueue))
 
-    StrBuilder.WriteString("# HELP uWSGI Server\r\n")
+    txt = "general_listen_queue_errors"
+    WriteHelp(fmt.Sprintf("# HELP %s%s Number of uwsgi server queue error\n", uwsgi_prefix, txt), true)
+    WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, txt, domain, data.ListenQueueErrors))
 
-    StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\"} %s\r\n",uwsgi_prefix, "general_version",domain, data.Version))
-    StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\"} %d\r\n",uwsgi_prefix, "general_listen_queue",domain, data.ListenQueue))
-    StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\"} %d\r\n",uwsgi_prefix, "general_listen_queue_errors",domain, data.ListenQueueErrors))
-    StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\"} %d\r\n",uwsgi_prefix, "general_signal_queue",domain, data.SignalQueue))
-    StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\"} %d\r\n",uwsgi_prefix, "general_load",domain, data.Load))
+	txt = "general_signal_queue"
+	WriteHelp(fmt.Sprintf("# HELP %s%s uwsgi signal queue\n", uwsgi_prefix, txt), true)
+	WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, txt, domain, data.SignalQueue))
 
     for _, arr := range(data.Locks) {
-        StrBuilder.WriteString("\r\n# HELP uWSGI looks\r\n")
         for key, val := range(arr) {
-            StrBuilder.Write([]byte (fmt.Sprintf("%s%s_%s{domain=\"%s\"} %d\r\n", uwsgi_prefix, "locks",domain, SanitizeField(key), val)))
+            key = SanitizeField(key)
+            WriteHelp((fmt.Sprintf("# HELP %s%s_%s Loks\n",uwsgi_prefix,"locks",key)),true)
+            WriteMetrics(fmt.Sprintf("%s%s_%s{domain=\"%s\"} %d\n", uwsgi_prefix, "locks", key, domain, val))
         }
     }
 
-    for _, Socket := range(data.Sockets) {
-        StrBuilder.WriteString("\r\n# HELP uWSGI Soket\r\n")
+    for iSoket, Socket := range(data.Sockets) {
+        WriteHelp(fmt.Sprintf("# HELP %s%s Sokets queue\n",uwsgi_prefix,"sokets_queue"), (iSoket == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, "sockets_queue",domain, Socket.Queue))
 
-        StrBuilder.WriteString(fmt.Sprintf("Soket:%s\r\n", Socket.Name))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\"} %d\r\n",uwsgi_prefix, "sockets_queue",domain, Socket.Queue))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\"} %d\r\n",uwsgi_prefix, "sockets_max_queue",domain, Socket.MaxQueue))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\"} %d\r\n",uwsgi_prefix, "sockets_shared",domain, Socket.Shared))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\"} %d\r\n",uwsgi_prefix, "sockets_can_off_load",domain, Socket.CanOffload))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Max queue\n",uwsgi_prefix,"sockets_max_queue"), (iSoket == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, "sockets_max_queue",domain, Socket.MaxQueue))
+
+        WriteHelp(fmt.Sprintf("# HELP %s%s Sockets shared\n",uwsgi_prefix,"sockets_shared"), (iSoket == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, "sockets_shared",domain, Socket.Shared))
+
+        WriteHelp(fmt.Sprintf("# HELP %s%s Sokets queue\n",uwsgi_prefix,"sockets_can_off_load"), (iSoket == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, "sockets_can_off_load",domain, Socket.CanOffload))
     }
 
-    for _,Cache := range(data.Cache) {
-        StrBuilder.WriteString(fmt.Sprintf("\r\n# HELP uWSGI Chache Name:%s, Hash:%s\r\n", Cache.Name,Cache.Hash))
+    for iCache, Cache := range(data.Cache) {
+        txt := "cache_max_items"
+        WriteHelp(fmt.Sprintf("# HELP %s%s Max item in uwsgi cache\n", uwsgi_prefix, txt), (iCache == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\n", uwsgi_prefix, txt,Cache.Name, Cache.Hash, domain, Cache.MaxItems))
 
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\r\n", uwsgi_prefix, "chache_max_items",Cache.Name, Cache.Hash, domain, Cache.MaxItems))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\r\n", uwsgi_prefix, "chache_items",Cache.Name, Cache.Hash, domain, Cache.Items))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\r\n", uwsgi_prefix, "chache_hits",Cache.Name, Cache.Hash, domain, Cache.Hits))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\r\n", uwsgi_prefix, "chache_miss",Cache.Name, Cache.Hash, domain, Cache.Miss))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\r\n", uwsgi_prefix, "chache_full",Cache.Name, Cache.Hash, domain, Cache.Full))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\r\n", uwsgi_prefix, "chache_last_modified_at",Cache.Name, Cache.Hash, domain, Cache.LastModifiedAt))
+        txt = "cache_items"
+        WriteHelp(fmt.Sprintf("# HELP %s%s number current item in cache\n", uwsgi_prefix, txt),(iCache == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\n", uwsgi_prefix, txt, Cache.Name, Cache.Hash, domain, Cache.Items))
+
+        txt = "cache_hits"
+        WriteHelp(fmt.Sprintf("# HELP %s%s number of hits of uwsgi cache\n", uwsgi_prefix, txt), (iCache == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\n", uwsgi_prefix, txt, Cache.Name, Cache.Hash, domain, Cache.Hits))
+
+        txt = "cache_miss"
+        WriteHelp(fmt.Sprintf("# HELP %s%s TODO: unknow, read uwsgi source code\n", uwsgi_prefix, txt), (iCache == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\n", uwsgi_prefix, txt, Cache.Name, Cache.Hash, domain, Cache.Miss))
+
+        txt = "cache_full"
+        WriteHelp(fmt.Sprintf("# HELP %s%s Unknow must read uwsgi source\n", uwsgi_prefix, txt), (iCache == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\n", uwsgi_prefix, txt, Cache.Name, Cache.Hash, domain, Cache.Full))
+
+        txt = "cache_last_modified_at"
+        WriteHelp(fmt.Sprintf("# HELP %s%s Last modified ithem in uwsgi cache\n", uwsgi_prefix, txt), (iCache == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\n", uwsgi_prefix, txt, Cache.Name, Cache.Hash, domain, Cache.LastModifiedAt))
     }
 
-    for _,Worker := range(data.Workers) {
-        StrBuilder.WriteString(fmt.Sprintf("\r\n###############                  HELP uWSGI Worker %d                   ###############\r\n",Worker.ID))
+    for iworker, Worker := range(data.Workers) {
+        txt := "workers_id"
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker id\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.ID))
 
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_accepting",domain, Worker.ID, Worker.Accepting))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_requests",domain, Worker.ID, Worker.Requests))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_delta_requests ",domain, Worker.ID, Worker.DeltaRequests))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_exceptions ",domain, Worker.ID, Worker.Exceptions))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_harakiri_count ",domain, Worker.ID, Worker.HarakiriCount))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_signals",domain, Worker.ID, Worker.Signals))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_signal_queue",domain, Worker.ID, Worker.SignalQueue))
-        StrBuilder.WriteString(fmt.Sprintf("# HELP uWSGI worker status: %d cheap, %d pause, %d sig, %d busy, %d idle\r\n", cheap, pause, sig, busy,idle))
+        txt = "workers_accepting"
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker accepting request\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Accepting))
 
+        txt = "workers_requests"
+		WriteHelp(fmt.Sprintf("# HELP %s%s Worker request elaborated\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Requests))
+
+        txt = "workers_delta_requests"
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker delta request TODO: Check uwsgiSource\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.DeltaRequests))
+
+        txt = "workers_exceptions"
+		WriteHelp(fmt.Sprintf("# HELP %s%s Worker exceptions counter\n", uwsgi_prefix, txt), (iworker == 0))
+		WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Exceptions))
+
+		txt = "workers_harakiri_count"
+		WriteHelp(fmt.Sprintf("# HELP %s%s Worker harakiri count\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.HarakiriCount))
+
+		txt = "workers_signals"
+		WriteHelp(fmt.Sprintf("# HELP %s%s Worker signal elaborated count\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Signals))
+
+        txt = "workers_signal_queue"
+	    WriteHelp(fmt.Sprintf("# HELP %s%s Worker signal queue\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.SignalQueue))
+
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker status %d cheap %d pause %d sig %d busy %d idle\n",uwsgi_prefix, "workers_status", cheap, pause, sig, busy,idle), (iworker == 0))
         // Better return number
         switch(Worker.Status) {
         case "cheap":
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_status",domain, Worker.ID, cheap))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, "workers_status",domain, iworker, cheap))
         case "pause":
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_status",domain, Worker.ID, pause))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, "workers_status",domain, iworker, pause))
         case "sig":
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_status",domain, Worker.ID, sig))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, "workers_status",domain, iworker, sig))
         case "busy":
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_status",domain, Worker.ID, busy))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, "workers_status",domain, iworker, busy))
         case "idle":
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_status",domain, Worker.ID, idle))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, "workers_status",domain, iworker, idle))
         }
 
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_rss",domain, Worker.ID, Worker.Rss))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_vsz",domain, Worker.ID, Worker.Vsz))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_running_time",domain, Worker.ID, Worker.RunningTime))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_last_spawn",domain, Worker.ID, Worker.LastSpawn))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_respawn_count",domain, Worker.ID, Worker.RespawnCount))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_tx",domain, Worker.ID, Worker.Tx))
-        StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\"} %d\r\n",uwsgi_prefix, "workers_avg_rt",domain, Worker.ID, Worker.AvgRt))
+        txt = "workers_rss"
+		WriteHelp(fmt.Sprintf("# HELP %s%s Worker rss\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Rss))
+
+        txt = "workers_vsz"
+		WriteHelp(fmt.Sprintf("# HELP %s%s Worker TODO\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Vsz))
+
+        txt = "workers_running_time"
+		WriteHelp(fmt.Sprintf("# HELP %s%s Worker Worker running time\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.RunningTime))
+
+        txt = "workers_last_spawn"
+		WriteHelp(fmt.Sprintf("# HELP %s%s Last time stamp spawn\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.LastSpawn))
+
+        txt = "workers_respawn_count"
+		WriteHelp(fmt.Sprintf("# HELP %s%s Worker respawn count\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.RespawnCount))
+
+        txt = "workers_tx"
+		WriteHelp(fmt.Sprintf("# HELP %s%s Worker byte trasmitted\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Tx))
+
+        txt = "workers_avg_rt"
+		WriteHelp(fmt.Sprintf("# HELP %s%s Worker average request\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.AvgRt))
 
         for _, App := range(Worker.Apps) {
-            StrBuilder.WriteString("\r\n# HELP uWSGI App\r\n")
+            txt := "apps_modifier1"
+            WriteHelp(fmt.Sprintf("# HELP %s%s apps modifier1 wsgi protocol\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", app=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, App.ID, App.Modifier1))
 
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\", app=\"%d\"} %d\r\n",uwsgi_prefix, "apps_modifier1",domain, Worker.ID, App.ID, App.Modifier1))
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\", app=\"%d\"} %d\r\n",uwsgi_prefix, "apps_startup_time",domain, Worker.ID, App.ID, App.StartupTime))
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\", app=\"%d\"} %d\r\n",uwsgi_prefix, "apps_requests",domain, Worker.ID, App.ID, App.Requests))
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\", app=\"%d\"} %d\r\n",uwsgi_prefix, "apps_exceptions",domain, Worker.ID, App.ID, App.Exceptions))
+            txt = "apps_startup_time"
+            WriteHelp(fmt.Sprintf("# HELP %s%s apps start up time\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", app=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, App.ID, App.StartupTime))
+
+            txt = "apps_requests"
+            WriteHelp(fmt.Sprintf("# HELP %s%s app request\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", app=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, App.ID, App.Requests))
+
+            txt = "apps_exceptions"
+            WriteHelp(fmt.Sprintf("# HELP %s%s application execeptions\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", app=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, App.ID, App.Exceptions))
         }
 
         for _, Core := range(Worker.Cores) {
-            StrBuilder.WriteString("\r\n# HELP uWSGI Core\r\n")
+            txt := "cores_requests"
+            WriteHelp(fmt.Sprintf("# HELP %s%s cores_requests\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_requests",domain, iworker, Core.ID, Core.Requests))
 
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\", core=\"%d\"} %d\r\n",uwsgi_prefix, "cores_requests",domain, Worker.ID, Core.ID, Core.Requests))
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\", core=\"%d\"} %d\r\n",uwsgi_prefix, "cores_static_requests",domain, Worker.ID, Core.ID, Core.StaticRequests))
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\", core=\"%d\"} %d\r\n",uwsgi_prefix, "cores_routed_requests",domain, Worker.ID, Core.ID, Core.RoutedRequests))
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\", core=\"%d\"} %d\r\n",uwsgi_prefix, "cores_offloaded_requests",domain, Worker.ID, Core.ID, Core.OffloadedRequests))
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\", core=\"%d\"} %d\r\n",uwsgi_prefix, "cores_write_errors",domain, Worker.ID, Core.ID, Core.WriteErrors))
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\", core=\"%d\"} %d\r\n",uwsgi_prefix, "cores_read_errors",domain, Worker.ID, Core.ID, Core.ReadErrors))
-            StrBuilder.WriteString(fmt.Sprintf("%s%s{domain=\"%s\", workerid=\"%d\", core=\"%d\"} %d\r\n",uwsgi_prefix, "cores_in_request",domain, Worker.ID, Core.ID, Core.InRequest))
-        }
-        StrBuilder.WriteString("#######################################################################################\r\n")
+            txt = "cores_static_requests"
+            WriteHelp(fmt.Sprintf("# HELP %s%s cores_static_requests\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_static_requests",domain, iworker, Core.ID, Core.StaticRequests))
+
+            txt = "cores_routed_requests"
+            WriteHelp(fmt.Sprintf("# HELP %s%s cores_routed_requests\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_routed_requests",domain, iworker, Core.ID, Core.RoutedRequests))
+
+            txt = "cores_offloaded_requests"
+            WriteHelp(fmt.Sprintf("# HELP %s%s cores_offloaded_requests\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_offloaded_requests",domain, iworker, Core.ID, Core.OffloadedRequests))
+
+            txt = "cores_write_errors"
+            WriteHelp(fmt.Sprintf("# HELP %s%s cores_write_errors\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_write_errors",domain, iworker, Core.ID, Core.WriteErrors))
+
+            txt = "cores_read_errors"
+            WriteHelp(fmt.Sprintf("# HELP %s%s cores_read_errors\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_read_errors",domain, iworker, Core.ID, Core.ReadErrors))
+
+            txt = "cores_in_request"
+            WriteHelp(fmt.Sprintf("# HELP %s%s cores_in_request\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_in_request",domain, iworker, Core.ID, Core.InRequest))
+       }
     }
+    // Disable help must write only fist time
+    globalDisableHelp = false
     return StrBuilder.String()
+
 }
 
 
@@ -272,6 +400,8 @@ func ReadStatsSoket_uWSGI () string {
 
     fmt.Printf("[DEBUG  ] Map len:%d\r\n", len(FileMap))
 
+    // Enable help fist time
+    EnableHelp()
     wg.Add(len(FileMap))
     for Domain, FullPath := range FileMap {
 
@@ -305,4 +435,3 @@ func ReadStatsSoket_uWSGI () string {
     wg.Wait()
     return AllMetrics.String()
 }
-

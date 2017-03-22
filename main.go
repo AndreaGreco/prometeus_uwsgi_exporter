@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"github.com/gin-gonic/gin"
 	// "github.com/gin-gonic/gin/binding"
-	// "github.com/go-telegram-bot-api/telegram-bot-api"
 	"gopkg.in/yaml.v2"
  //   "time"
     "fmt"
@@ -24,6 +23,7 @@ type StatsSoketConf_t struct {
 type Config_t struct {
 	Port int `yaml:"port"`
 	SoketDir string `yaml:"soket_dir"`
+    PIDPath string `yaml:"pidfile"`
 	StatsSokets []StatsSoketConf_t `yaml:"stats_sokets"`
 }
 
@@ -37,6 +37,7 @@ var FileMap map[string] string
   * @brief Flag config
   */
 var config_path = flag.String("c", "config.yaml", "Path to a config file")
+var noPID = flag.Bool("n",false,"Not deploy PID file")
 
 /**
  * @brief Configuration struct
@@ -52,7 +53,7 @@ func ParseConfig () {
     data, err := ioutil.ReadFile(*config_path)
 
     if err != nil {
-        log.Fatalf("[FATAL] Impossible read file:%s\r\n Error%v", config_path, err)
+        log.Fatalf("[FATAL] Impossible read file:%s Error%v", *config_path, err)
     }
 
     err = yaml.Unmarshal([]byte(data), &Conf)
@@ -111,7 +112,7 @@ func ValidateConfig () {
     // Calculate full path
     // Fist validate soket dir path
     if err != nil {
-        log.Fatalf("[FATAL] Error on:%s\r\n%v:",Conf.SoketDir, err)
+        log.Fatalf("[FATAL] Error on:%s %v",Conf.SoketDir, err)
     }
 
     // Check path fist start polling
@@ -133,16 +134,49 @@ func ValidateConfig () {
     }
 }
 
+/**
+ *
+ * @brief Deploy pid file
+ * Deploy pid file, Correct true, else false
+ */
+func DeployPID() bool {
+    /**
+     * TODO: Demonize Demonize
+     * For do a good job this part must be demonizzed with double fork, write pid in /run/PIDNO
+     * Find way to handle http with GIN or other lib to hangle reload, and restart signals
+     */
+    if *noPID {
+        return true
+    }
+
+    // So ugly but it work
+    PID := os.Getpid()
+
+    pidFile,err := os.Open(Conf.PIDPath)
+    if err != nil {
+        log.Printf("Impossible open file, %s\r\n", err)
+        pidFile.Close()
+        return false
+    }
+
+    pidFile.WriteString(string(PID))
+    pidFile.Sync()
+    pidFile.Close()
+
+    return true
+}
+
 func main() {
     // Init
 	flag.Parse()
     ParseConfig()
     ValidateConfig()
-    // End init
 
-    // Is here for debug reason
+    if !DeployPID() {
+        return
+    }
 
-    /* Enable here for reactivate GIN */
+    log.Printf("[INFO  ] Bin port:%d", Conf.Port)
     gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
     router.GET("/metrics", GET_Handling)
