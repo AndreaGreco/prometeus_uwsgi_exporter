@@ -282,11 +282,11 @@ func uWSGI_DataFormat(data Uwsgi_json_t, domain string)string {
         }
 
         txt = "workers_rss"
-        WriteHelp(fmt.Sprintf("# HELP %s%s Worker rss\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker resident set size\n", uwsgi_prefix, txt), (iworker == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Rss))
 
         txt = "workers_vsz"
-        WriteHelp(fmt.Sprintf("# HELP %s%s Worker TODO\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker virtual memory sizen", uwsgi_prefix, txt), (iworker == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Vsz))
 
         txt = "workers_running_time"
@@ -311,19 +311,19 @@ func uWSGI_DataFormat(data Uwsgi_json_t, domain string)string {
 
         for _, App := range(Worker.Apps) {
             txt := "apps_modifier1"
-            WriteHelp(fmt.Sprintf("# HELP %s%s apps modifier1 wsgi protocol\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteHelp(fmt.Sprintf("# HELP %s%s Apps modifier1 wsgi protocol\n",uwsgi_prefix,txt), (iworker == 0))
             WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", app=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, App.ID, App.Modifier1))
 
             txt = "apps_startup_time"
-            WriteHelp(fmt.Sprintf("# HELP %s%s apps start up time\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteHelp(fmt.Sprintf("# HELP %s%s Apps start up time\n",uwsgi_prefix,txt), (iworker == 0))
             WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", app=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, App.ID, App.StartupTime))
 
             txt = "apps_requests"
-            WriteHelp(fmt.Sprintf("# HELP %s%s app request\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteHelp(fmt.Sprintf("# HELP %s%s App request\n",uwsgi_prefix,txt), (iworker == 0))
             WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", app=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, App.ID, App.Requests))
 
             txt = "apps_exceptions"
-            WriteHelp(fmt.Sprintf("# HELP %s%s application execeptions\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteHelp(fmt.Sprintf("# HELP %s%s App execeptions\n",uwsgi_prefix,txt), (iworker == 0))
             WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", app=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, App.ID, App.Exceptions))
         }
 
@@ -353,7 +353,7 @@ func uWSGI_DataFormat(data Uwsgi_json_t, domain string)string {
             WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_read_errors",domain, iworker, Core.ID, Core.ReadErrors))
 
             txt = "cores_in_request"
-            WriteHelp(fmt.Sprintf("# HELP %s%s cores in request\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteHelp(fmt.Sprintf("# HELP %s%s Cores in request\n",uwsgi_prefix,txt), (iworker == 0))
             WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_in_request",domain, iworker, Core.ID, Core.InRequest))
        }
     }
