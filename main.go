@@ -123,13 +123,12 @@ func ValidateConfig () {
         if CheckUnixSoket(FullPath) {
             FoundError = true
         }
-
         FileMap[SoketPath.Domain] = FullPath
     }
 
     if !FoundError {
         log.Println("[INFO  ] Configuration correct, no error detect")
-    }else {
+    } else {
         log.Println("[INFO  ] Error found check log")
     }
 }
@@ -141,7 +140,7 @@ func ValidateConfig () {
  */
 func DeployPID() bool {
     /**
-     * TODO: Demonize Demonize
+     * TODO: Demonize
      * For do a good job this part must be demonizzed with double fork, write pid in /run/PIDNO
      * Find way to handle http with GIN or other lib to hangle reload, and restart signals
      */

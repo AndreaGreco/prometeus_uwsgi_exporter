@@ -1,14 +1,14 @@
 package  main
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"log"
-	"io/ioutil"
-    "strings"
-    "net"
-    "sync"
+    "bytes"
+    "encoding/json"
+    "fmt"
+    "log"
+    "io/ioutil"
+  "strings"
+  "net"
+  "sync"
 )
 
 // JSON Definition
@@ -114,20 +114,26 @@ var StrBuilder bytes.Buffer
 
 var globalDisableHelp bool
 
+/**
+ * @brief allow to enable \ref globalDisableHelp
+ * Help must be redered only one time, or prometheus return parsing error
+ * Then is disabled by render function every time is completed.busy
+ * This function allow main thread to enable help at fist turn in for-loop
+ */
 func EnableHelp() {
     globalDisableHelp = true
 }
 
-
 /**
  * @brief uwsgi prefix string
- * string on head to all uwsgi prometheus metrics
+ * string on head to all uwsgi metrics
  */
 const uwsgi_prefix = "uwsgi_"
 
 /**
  * @brief Sanitizze string
  *
+ * Some metrics label must be sanitizzed, it contain space, or other special charter.
  * Remove:
  * -    " " --> "_"
  */
@@ -139,7 +145,7 @@ func SanitizeField (val string) string {
 
 
 /**
- * @brief Write help string in string buffer
+ * @brief Write a help string in sting buffer
  */
 func WriteHelp(str string, write bool) {
     if write && globalDisableHelp {
@@ -155,12 +161,10 @@ func WriteMetrics(metrics string){
 }
 
 /**
- * @brief Take uwsgi json struct and
+ * @brief Take uwsgi json struct and render Prometheus metrics
  */
 func uWSGI_DataFormat(data Uwsgi_json_t, domain string)string {
-
     StrBuilder.Reset()
-
     /**
      * Try respect prometheus line guide for write expoter:
      * https://prometheus.io/docs/practices/naming/
@@ -173,30 +177,34 @@ func uWSGI_DataFormat(data Uwsgi_json_t, domain string)string {
     WriteHelp(fmt.Sprintf("# HELP %s%s Number of uwsgi server queue error\n", uwsgi_prefix, txt), true)
     WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, txt, domain, data.ListenQueueErrors))
 
-	txt = "general_signal_queue"
-	WriteHelp(fmt.Sprintf("# HELP %s%s uwsgi signal queue\n", uwsgi_prefix, txt), true)
-	WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, txt, domain, data.SignalQueue))
+    txt = "general_signal_queue"
+    WriteHelp(fmt.Sprintf("# HELP %s%s Uwsgi signal queue\n", uwsgi_prefix, txt), true)
+    WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, txt, domain, data.SignalQueue))
 
     for _, arr := range(data.Locks) {
         for key, val := range(arr) {
             key = SanitizeField(key)
-            WriteHelp((fmt.Sprintf("# HELP %s%s_%s Loks\n",uwsgi_prefix,"locks",key)),true)
+            WriteHelp((fmt.Sprintf("# HELP %s%s_%s Locks %s\n",uwsgi_prefix,"locks",key, key)),true)
             WriteMetrics(fmt.Sprintf("%s%s_%s{domain=\"%s\"} %d\n", uwsgi_prefix, "locks", key, domain, val))
         }
     }
 
     for iSoket, Socket := range(data.Sockets) {
-        WriteHelp(fmt.Sprintf("# HELP %s%s Sokets queue\n",uwsgi_prefix,"sokets_queue"), (iSoket == 0))
-        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, "sockets_queue",domain, Socket.Queue))
+        txt := "sokets_queue"
+        WriteHelp(fmt.Sprintf("# HELP %s%s Sokets queue\n",uwsgi_prefix, txt), (iSoket == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, txt,domain, Socket.Queue))
 
-        WriteHelp(fmt.Sprintf("# HELP %s%s Max queue\n",uwsgi_prefix,"sockets_max_queue"), (iSoket == 0))
-        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, "sockets_max_queue",domain, Socket.MaxQueue))
+        txt = "sockets_max_queue"
+        WriteHelp(fmt.Sprintf("# HELP %s%s Max queue length\n",uwsgi_prefix, txt), (iSoket == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, txt,domain, Socket.MaxQueue))
 
-        WriteHelp(fmt.Sprintf("# HELP %s%s Sockets shared\n",uwsgi_prefix,"sockets_shared"), (iSoket == 0))
-        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, "sockets_shared",domain, Socket.Shared))
+        txt = "sockets_shared"
+        WriteHelp(fmt.Sprintf("# HELP %s%s Sockets shared\n",uwsgi_prefix, txt), (iSoket == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, txt,domain, Socket.Shared))
 
-        WriteHelp(fmt.Sprintf("# HELP %s%s Sokets queue\n",uwsgi_prefix,"sockets_can_off_load"), (iSoket == 0))
-        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, "sockets_can_off_load",domain, Socket.CanOffload))
+        txt = "sockets_can_off_load"
+        WriteHelp(fmt.Sprintf("# HELP %s%s Sokets queue\n",uwsgi_prefix, txt), (iSoket == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n",uwsgi_prefix, txt,domain, Socket.CanOffload))
     }
 
     for iCache, Cache := range(data.Cache) {
@@ -209,15 +217,15 @@ func uWSGI_DataFormat(data Uwsgi_json_t, domain string)string {
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\n", uwsgi_prefix, txt, Cache.Name, Cache.Hash, domain, Cache.Items))
 
         txt = "cache_hits"
-        WriteHelp(fmt.Sprintf("# HELP %s%s number of hits of uwsgi cache\n", uwsgi_prefix, txt), (iCache == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s cache hits\n", uwsgi_prefix, txt), (iCache == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\n", uwsgi_prefix, txt, Cache.Name, Cache.Hash, domain, Cache.Hits))
 
         txt = "cache_miss"
-        WriteHelp(fmt.Sprintf("# HELP %s%s TODO: unknow, read uwsgi source code\n", uwsgi_prefix, txt), (iCache == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Cache miss\n", uwsgi_prefix, txt), (iCache == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\n", uwsgi_prefix, txt, Cache.Name, Cache.Hash, domain, Cache.Miss))
 
         txt = "cache_full"
-        WriteHelp(fmt.Sprintf("# HELP %s%s Unknow must read uwsgi source\n", uwsgi_prefix, txt), (iCache == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Cache full\n", uwsgi_prefix, txt), (iCache == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", name=\"%s\", hash=\"%s\"} %d\n", uwsgi_prefix, txt, Cache.Name, Cache.Hash, domain, Cache.Full))
 
         txt = "cache_last_modified_at"
@@ -235,7 +243,7 @@ func uWSGI_DataFormat(data Uwsgi_json_t, domain string)string {
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Accepting))
 
         txt = "workers_requests"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Worker request elaborated\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker request elaborated\n", uwsgi_prefix, txt), (iworker == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Requests))
 
         txt = "workers_delta_requests"
@@ -243,19 +251,19 @@ func uWSGI_DataFormat(data Uwsgi_json_t, domain string)string {
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.DeltaRequests))
 
         txt = "workers_exceptions"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Worker exceptions counter\n", uwsgi_prefix, txt), (iworker == 0))
-		WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Exceptions))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker exceptions counter\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Exceptions))
 
-		txt = "workers_harakiri_count"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Worker harakiri count\n", uwsgi_prefix, txt), (iworker == 0))
+        txt = "workers_harakiri_count"
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker harakiri count\n", uwsgi_prefix, txt), (iworker == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.HarakiriCount))
 
-		txt = "workers_signals"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Worker signal elaborated count\n", uwsgi_prefix, txt), (iworker == 0))
+        txt = "workers_signals"
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker signal elaborated count\n", uwsgi_prefix, txt), (iworker == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Signals))
 
         txt = "workers_signal_queue"
-	    WriteHelp(fmt.Sprintf("# HELP %s%s Worker signal queue\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker signal queue\n", uwsgi_prefix, txt), (iworker == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.SignalQueue))
 
         WriteHelp(fmt.Sprintf("# HELP %s%s Worker status %d cheap %d pause %d sig %d busy %d idle\n",uwsgi_prefix, "workers_status", cheap, pause, sig, busy,idle), (iworker == 0))
@@ -274,31 +282,31 @@ func uWSGI_DataFormat(data Uwsgi_json_t, domain string)string {
         }
 
         txt = "workers_rss"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Worker rss\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker rss\n", uwsgi_prefix, txt), (iworker == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Rss))
 
         txt = "workers_vsz"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Worker TODO\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker TODO\n", uwsgi_prefix, txt), (iworker == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Vsz))
 
         txt = "workers_running_time"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Worker Worker running time\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker Worker running time\n", uwsgi_prefix, txt), (iworker == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.RunningTime))
 
         txt = "workers_last_spawn"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Last time stamp spawn\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Last time stamp spawn\n", uwsgi_prefix, txt), (iworker == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.LastSpawn))
 
         txt = "workers_respawn_count"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Worker respawn count\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker respawn count\n", uwsgi_prefix, txt), (iworker == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.RespawnCount))
 
         txt = "workers_tx"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Worker byte trasmitted\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker byte trasmitted\n", uwsgi_prefix, txt), (iworker == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.Tx))
 
         txt = "workers_avg_rt"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Worker average request\n", uwsgi_prefix, txt), (iworker == 0))
+        WriteHelp(fmt.Sprintf("# HELP %s%s Worker average request\n", uwsgi_prefix, txt), (iworker == 0))
         WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n",uwsgi_prefix, txt, domain, iworker, Worker.AvgRt))
 
         for _, App := range(Worker.Apps) {
@@ -321,38 +329,37 @@ func uWSGI_DataFormat(data Uwsgi_json_t, domain string)string {
 
         for _, Core := range(Worker.Cores) {
             txt := "cores_requests"
-            WriteHelp(fmt.Sprintf("# HELP %s%s cores_requests\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteHelp(fmt.Sprintf("# HELP %s%s Cores requests\n",uwsgi_prefix,txt), (iworker == 0))
             WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_requests",domain, iworker, Core.ID, Core.Requests))
 
             txt = "cores_static_requests"
-            WriteHelp(fmt.Sprintf("# HELP %s%s cores_static_requests\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteHelp(fmt.Sprintf("# HELP %s%s Cores static resource request count\n",uwsgi_prefix,txt), (iworker == 0))
             WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_static_requests",domain, iworker, Core.ID, Core.StaticRequests))
 
             txt = "cores_routed_requests"
-            WriteHelp(fmt.Sprintf("# HELP %s%s cores_routed_requests\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteHelp(fmt.Sprintf("# HELP %s%s Cores routed requests\n",uwsgi_prefix,txt), (iworker == 0))
             WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_routed_requests",domain, iworker, Core.ID, Core.RoutedRequests))
 
             txt = "cores_offloaded_requests"
-            WriteHelp(fmt.Sprintf("# HELP %s%s cores_offloaded_requests\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteHelp(fmt.Sprintf("# HELP %s%s Cores offloaded requests\n",uwsgi_prefix,txt), (iworker == 0))
             WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_offloaded_requests",domain, iworker, Core.ID, Core.OffloadedRequests))
 
             txt = "cores_write_errors"
-            WriteHelp(fmt.Sprintf("# HELP %s%s cores_write_errors\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteHelp(fmt.Sprintf("# HELP %s%s Cores write errors\n",uwsgi_prefix,txt), (iworker == 0))
             WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_write_errors",domain, iworker, Core.ID, Core.WriteErrors))
 
             txt = "cores_read_errors"
-            WriteHelp(fmt.Sprintf("# HELP %s%s cores_read_errors\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteHelp(fmt.Sprintf("# HELP %s%s Cores read errors\n",uwsgi_prefix,txt), (iworker == 0))
             WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_read_errors",domain, iworker, Core.ID, Core.ReadErrors))
 
             txt = "cores_in_request"
-            WriteHelp(fmt.Sprintf("# HELP %s%s cores_in_request\n",uwsgi_prefix,txt), (iworker == 0))
+            WriteHelp(fmt.Sprintf("# HELP %s%s cores in request\n",uwsgi_prefix,txt), (iworker == 0))
             WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\", core=\"%d\"} %d\n",uwsgi_prefix, "cores_in_request",domain, iworker, Core.ID, Core.InRequest))
        }
     }
-    // Disable help must write only fist time
+    // Disable help must be write only fist time or prometeus return error
     globalDisableHelp = false
     return StrBuilder.String()
-
 }
 
 
@@ -391,9 +398,18 @@ func ProvideJsonTextFromUnixSoket(FullPath string) ([]byte,error) {
 
 
 /**
- * @brief make reading of all stast soket
+ * @brief Perform reading of uwsgi stast soket
  */
 func ReadStatsSoket_uWSGI () string {
+    /*
+    * Worning, this function use go subroutine for
+    * make parallel reading.
+    * Function is splitted in 3 main part:
+    * -   Create all gorouting with for loop
+    * -   Read all unix soket
+    * -   Concatenate string
+    * This part is sheduled by internal go scheduler.
+    */
     var AllMetrics bytes.Buffer
     queue := make(chan string, 1)
     var wg sync.WaitGroup
