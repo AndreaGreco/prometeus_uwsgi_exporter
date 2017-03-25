@@ -361,8 +361,6 @@ func uWSGI_DataFormat(data Uwsgi_json_t, domain string)string {
     return StrBuilder.String()
 }
 
-
-
 /**
  * @brief Get json text from File DEBUG
  */
@@ -401,17 +399,19 @@ func ProvideJsonTextFromUnixSoket(FullPath string) ([]byte,error) {
  */
 func ReadStatsSoket_uWSGI () []byte {
     /*
-    * Worning, this function use go subroutine for
-    * make parallel reading.
-    * Function is splitted in 3 main part:
-    * -   Create all gorouting with for loop
+    * Worning, this function use go subroutine for parallel reading of soket.
+    * Function is splitted this part:
+    * -   Create comunication channel
+    * -   Create all go-routing with for loop
     * -   Read all unix soket
     * -   Concatenate string
+    * -   close channel
     * This part is sheduled by internal go scheduler.
     */
     var AllMetrics bytes.Buffer
-    queue := make(chan string, 1)
     var wg sync.WaitGroup
+
+    queue := make(chan string, 1)
 
     AllMetrics.Reset()
     log.Debugf("Map len:%d\r\n", len(FileMap))
@@ -420,19 +420,18 @@ func ReadStatsSoket_uWSGI () []byte {
     EnableHelp()
     wg.Add(len(FileMap))
     for Domain, FullPath := range FileMap {
-
         go func(FullPath string, CurretDomain string) {
             Curret_uWSGI_Data := new(Uwsgi_json_t)
 
             text,err := ProvideJsonTextFromUnixSoket(FullPath)
-            if err != nil{
+            if err != nil {
                 log.Errorf("Cannot read soket:%v", err)
                 wg.Done()
                 return
             }
 
             err = json.Unmarshal(text, Curret_uWSGI_Data)
-            if err!= nil{
+            if err!= nil {
                 log.Errorf("Cannol Unmarshal json:%v", err)
                 wg.Done()
                 return

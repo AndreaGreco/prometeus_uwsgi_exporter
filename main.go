@@ -1,17 +1,16 @@
 package main
 
 import (
-	"flag"
-    "path"
-    "os"
-	"io/ioutil"
-	"net/http"
-    "net"
-//	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
-    "fmt"
+	"io/ioutil"
+	"net/http"
     "runtime"
+    "flag"
+    "path"
+	"net"
+    "fmt"
+    "os"
 )
 
 type StatsSoketConf_t struct {
@@ -23,7 +22,6 @@ type Config_t struct {
 	Port int                        `yaml:"port"`
 	SoketDir string                 `yaml:"soket_dir"`
     PIDPath string                  `yaml:"pidfile"`
-    LogFilePath string              `yaml:"logfile"`
 	StatsSokets []StatsSoketConf_t  `yaml:"stats_sokets"`
 }
 
@@ -34,24 +32,10 @@ var format = logging.MustStringFormatter(
 )
 
 func SetUpLogger() {
-    file, err := os.OpenFile(Conf.LogFilePath,os.O_APPEND|os.O_CREATE, 0644)
-    if err != nil {
-        fmt.Fprintf(os.Stderr,"Error %v\n", err)
-        os.Exit(1)
-    }
-
 	BkStdOut := logging.NewLogBackend(os.Stderr, "", 0)
-	BkLogFile := logging.NewLogBackend(file, "", 0)
-
-	// the function.
 	BkStdoutFormatter := logging.NewBackendFormatter(BkStdOut, format)
-
-	// Only errors and more severe messages should be sent to backend1
-	LogFileBkLevel := logging.AddModuleLevel(BkLogFile)
-	LogFileBkLevel.SetLevel(logging.ERROR, "")
-
 	// Set the backends to be used.
-	logging.SetBackend(LogFileBkLevel, BkStdoutFormatter)
+	logging.SetBackend(BkStdoutFormatter)
 }
 
 /**
