@@ -5,25 +5,54 @@ import (
     "path"
     "os"
 	"io/ioutil"
-	"log"
 	"net/http"
-	"github.com/gin-gonic/gin"
+    "net"
+//	"github.com/gin-gonic/gin"
+	"github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
     "fmt"
+    "runtime"
 )
 
 type StatsSoketConf_t struct {
-		Domain string `yaml:"domain"`
-		Soket string `yaml:"soket"`
+		Domain string               `yaml:"domain"`
+		Soket string                `yaml:"soket"`
 }
 
 type Config_t struct {
-	Port int `yaml:"port"`
-	SoketDir string `yaml:"soket_dir"`
-    PIDPath string `yaml:"pidfile"`
-	StatsSokets []StatsSoketConf_t `yaml:"stats_sokets"`
+	Port int                        `yaml:"port"`
+	SoketDir string                 `yaml:"soket_dir"`
+    PIDPath string                  `yaml:"pidfile"`
+    LogFilePath string              `yaml:"logfile"`
+	StatsSokets []StatsSoketConf_t  `yaml:"stats_sokets"`
 }
 
+// LOGGER
+var log = logging.MustGetLogger("uwsg_exporter")
+var format = logging.MustStringFormatter(
+	`%{color}%{time:15:04:05} %{shortfunc}  %{level:.4s} %{id:03x}%{color:reset} %{message}`,
+)
+
+func SetUpLogger() {
+    file, err := os.OpenFile(Conf.LogFilePath,os.O_APPEND|os.O_CREATE, 0644)
+    if err != nil {
+        fmt.Fprintf(os.Stderr,"Error %v\n", err)
+        os.Exit(1)
+    }
+
+	BkStdOut := logging.NewLogBackend(os.Stderr, "", 0)
+	BkLogFile := logging.NewLogBackend(file, "", 0)
+
+	// the function.
+	BkStdoutFormatter := logging.NewBackendFormatter(BkStdOut, format)
+
+	// Only errors and more severe messages should be sent to backend1
+	LogFileBkLevel := logging.AddModuleLevel(BkLogFile)
+	LogFileBkLevel.SetLevel(logging.ERROR, "")
+
+	// Set the backends to be used.
+	logging.SetBackend(LogFileBkLevel, BkStdoutFormatter)
+}
 
 /**
  * @brief map domain, full path
@@ -50,12 +79,14 @@ func ParseConfig () {
     data, err := ioutil.ReadFile(*config_path)
 
     if err != nil {
-        log.Fatalf("[FATAL] Impossible read file:%s Error%v", *config_path, err)
+        fmt.Fprintf(os.Stderr,"Impossible read file:%s Error%v", *config_path, err)
+        os.Exit(1)
     }
 
     err = yaml.Unmarshal([]byte(data), &Conf)
     if err != nil {
-        log.Fatalf("[FATAL] %v", err)
+        fmt.Fprintf(os.Stderr,"%v", err)
+        os.Exit(1)
     }
 }
 
@@ -71,10 +102,10 @@ func CheckUnixSoket(FullPath string) bool {
     if err != nil {
         if os.IsNotExist(err) {
             /* Error is not fatal, soket could be removed, uWSGI restared, Then log it, and continue */
-            log.Printf("[ERROR] Could not open %s\r\nThis error is not critical will be SKIP", FullPath)
+            log.Errorf("Could not open %s. This error is not critical will be SKIP", FullPath)
             FoundError = true
         } else {
-            log.Fatalf("[FATAL] %v\r\n", err)
+            log.Fatalf("%v\r\n", err)
         }
     }
     // Let open File descriptor, check error
@@ -87,14 +118,10 @@ func CheckUnixSoket(FullPath string) bool {
 /**
  * @brief callback handler GET request
  */
-func GET_Handling(c *gin.Context) {
-    str := ReadStatsSoket_uWSGI()
-    if str == "" {
-        c.String(http.StatusInternalServerError,"")
-    }
+func GET_Handling(w http.ResponseWriter, r *http.Request) {
+    w.Write(ReadStatsSoket_uWSGI())
+    w.Write([]byte(fmt.Sprintf("uwsgiexpoter_subroutine %d", runtime.NumGoroutine())))
 
-	c.String(http.StatusOK, str)
-    return
 }
 
 /**
@@ -103,13 +130,13 @@ func GET_Handling(c *gin.Context) {
 func ValidateConfig () {
     FoundError := false
     FileMap = make(map[string] string)
-    log.Println("[INFO  ] Start check configuration file")
+    log.Info("Start check configuration file")
 
     _,err := ioutil.ReadDir(Conf.SoketDir)
     // Calculate full path
     // Fist validate soket dir path
     if err != nil {
-        log.Fatalf("[FATAL] Error on:%s %v",Conf.SoketDir, err)
+        log.Fatalf("Error %v",err)
     }
 
     // Check path fist start polling
@@ -124,9 +151,9 @@ func ValidateConfig () {
     }
 
     if !FoundError {
-        log.Println("[INFO  ] Configuration correct, no error detect")
+        log.Info("Configuration correct, no error detect")
     } else {
-        log.Println("[INFO  ] Error found check log")
+        log.Info("Error found check log")
     }
 }
 
@@ -150,9 +177,7 @@ func DeployPID() bool {
 
     pidFile,err := os.Open(Conf.PIDPath)
     if err != nil {
-        log.Printf("Impossible open file, %s\r\n", err)
-        pidFile.Close()
-        return false
+        log.Fatalf("Impossible open file, %s\r\n", err)
     }
 
     pidFile.WriteString(string(PID))
@@ -163,19 +188,23 @@ func DeployPID() bool {
 }
 
 func main() {
-    // Init
+    // Setup env
 	flag.Parse()
     ParseConfig()
+    SetUpLogger()
+    DeployPID()
+    // End setup, from here all will be moved in second fork
+
     ValidateConfig()
 
-    if !DeployPID() {
-        return
+    l, err := net.Listen("tcp", fmt.Sprintf(":%d", Conf.Port))
+    if err != nil {
+        log.Fatal(err)
     }
 
-    log.Printf("[INFO  ] Bin port:%d", Conf.Port)
-    gin.SetMode(gin.ReleaseMode)
-	router := gin.Default()
-    router.GET("/metrics", GET_Handling)
-    router.Run(fmt.Sprintf(":%d", Conf.Port))
+    log.Infof("Bin port:%d", Conf.Port)
+    http.HandleFunc("/metrics", GET_Handling)
+
+    http.Serve(l,nil)
 }
 

@@ -4,7 +4,6 @@ import (
     "bytes"
     "encoding/json"
     "fmt"
-    "log"
     "io/ioutil"
   "strings"
   "net"
@@ -371,7 +370,7 @@ func ProvideJsonTextFile(path string) []byte {
     b, err := ioutil.ReadFile(path)
 
     if(err != nil) {
-        log.Panic("[PANIC] Impossible read file:%v", err)
+        log.Criticalf("Impossible read file:%v", err)
     }
     return b
 }
@@ -381,7 +380,7 @@ func ProvideJsonTextFile(path string) []byte {
  */
 func ProvideJsonTextFromUnixSoket(FullPath string) ([]byte,error) {
     if CheckUnixSoket(FullPath) {
-        log.Printf("[ERROR] Impossible open UnixSoket %s\r\n", FullPath)
+        log.Errorf("Impossible open UnixSoket %s\r\n", FullPath)
         return nil,nil
     }
 
@@ -400,7 +399,7 @@ func ProvideJsonTextFromUnixSoket(FullPath string) ([]byte,error) {
 /**
  * @brief Perform reading of uwsgi stast soket
  */
-func ReadStatsSoket_uWSGI () string {
+func ReadStatsSoket_uWSGI () []byte {
     /*
     * Worning, this function use go subroutine for
     * make parallel reading.
@@ -414,7 +413,8 @@ func ReadStatsSoket_uWSGI () string {
     queue := make(chan string, 1)
     var wg sync.WaitGroup
 
-    fmt.Printf("[DEBUG  ] Map len:%d\r\n", len(FileMap))
+    AllMetrics.Reset()
+    log.Debugf("Map len:%d\r\n", len(FileMap))
 
     // Enable help fist time
     EnableHelp()
@@ -426,14 +426,14 @@ func ReadStatsSoket_uWSGI () string {
 
             text,err := ProvideJsonTextFromUnixSoket(FullPath)
             if err != nil{
-                log.Printf("[ERROR] Cannot read soket:%v", err)
+                log.Errorf("Cannot read soket:%v", err)
                 wg.Done()
                 return
             }
 
             err = json.Unmarshal(text, Curret_uWSGI_Data)
             if err!= nil{
-                log.Printf("[ERROR] Cannol Unmarshal json:%v", err)
+                log.Errorf("Cannol Unmarshal json:%v", err)
                 wg.Done()
                 return
             }
@@ -448,6 +448,9 @@ func ReadStatsSoket_uWSGI () string {
             wg.Done()
         }
     }()
+
     wg.Wait()
-    return AllMetrics.String()
+    close(queue)
+
+    return AllMetrics.Bytes()
 }
