@@ -368,7 +368,7 @@ func ProvideJsonTextFile(path string) []byte {
     b, err := ioutil.ReadFile(path)
 
     if(err != nil) {
-        log.Criticalf("Impossible read file:%v", err)
+        log.Criticalf("Impossible read file:%v\n", err)
     }
     return b
 }
@@ -393,6 +393,10 @@ func ProvideJsonTextFromUnixSoket(FullPath string) ([]byte,error) {
     return buf[:nbyte],nil
 }
 
+type uWSGI_BufferCollector struct {
+    buffer bytes.Buffer
+    mutex sync.Mutex
+}
 
 /**
  * @brief Perform reading of uwsgi stast soket
@@ -408,13 +412,12 @@ func ReadStatsSoket_uWSGI () []byte {
     * -   close channel
     * This part is sheduled by internal go scheduler.
     */
-    var AllMetrics bytes.Buffer
     var wg sync.WaitGroup
 
-    queue := make(chan string, 1)
+    var AllMetrics uWSGI_BufferCollector
+    AllMetrics.buffer.Reset()
 
-    AllMetrics.Reset()
-    log.Debugf("Map len:%d\r\n", len(FileMap))
+    log.Debugf("Map len:%d\n", len(FileMap))
 
     // Enable help fist time
     EnableHelp()
@@ -436,20 +439,16 @@ func ReadStatsSoket_uWSGI () []byte {
                 wg.Done()
                 return
             }
-            queue <- uWSGI_DataFormat(*Curret_uWSGI_Data, CurretDomain)
+
+            // Formatting routine is not thread safe group all in global, then look here
+            AllMetrics.mutex.Lock()
+            value := uWSGI_DataFormat(*Curret_uWSGI_Data, CurretDomain)
+            AllMetrics.buffer.WriteString(value)
+            AllMetrics.mutex.Unlock()
+
+            wg.Done()
         } (FullPath, Domain)
     }
-
-    // Recive data from channel
-    go func() {
-        for response := range queue {
-            AllMetrics.WriteString(response)
-            wg.Done()
-        }
-    }()
-
     wg.Wait()
-    close(queue)
-
-    return AllMetrics.Bytes()
+    return AllMetrics.buffer.Bytes()
 }

@@ -47,6 +47,10 @@ var FileMap map[string] string
   * @brief Flag config
   */
 var config_path = flag.String("c", "config.yaml", "Path to a config file")
+
+/**
+ * Do not deploy PID FileMap
+ */
 var noPID = flag.Bool("n",false,"Not deploy PID file")
 
 /**
@@ -63,14 +67,12 @@ func ParseConfig () {
     data, err := ioutil.ReadFile(*config_path)
 
     if err != nil {
-        fmt.Fprintf(os.Stderr,"Impossible read file:%s Error%v", *config_path, err)
-        os.Exit(1)
+        log.Fatalf("Impossible read file:%s Error%v\n", *config_path, err)
     }
 
     err = yaml.Unmarshal([]byte(data), &Conf)
     if err != nil {
-        fmt.Fprintf(os.Stderr,"%v", err)
-        os.Exit(1)
+        log.Fatalf("Impossible read file:%s Error%v\n", *config_path, err)
     }
 }
 
@@ -86,10 +88,10 @@ func CheckUnixSoket(FullPath string) bool {
     if err != nil {
         if os.IsNotExist(err) {
             /* Error is not fatal, soket could be removed, uWSGI restared, Then log it, and continue */
-            log.Errorf("Could not open %s. This error is not critical will be SKIP", FullPath)
+            log.Errorf("Could not open %s. This error is not critical will be SKIP\n", FullPath)
             FoundError = true
         } else {
-            log.Fatalf("%v\r\n", err)
+            log.Fatalf("%v\n", err)
         }
     }
     // Let open File descriptor, check error
@@ -104,7 +106,7 @@ func CheckUnixSoket(FullPath string) bool {
  */
 func GET_Handling(w http.ResponseWriter, r *http.Request) {
     w.Write(ReadStatsSoket_uWSGI())
-    w.Write([]byte(fmt.Sprintf("uwsgiexpoter_subroutine %d", runtime.NumGoroutine())))
+    w.Write([]byte(fmt.Sprintf("uwsgiexpoter_subroutine %d\n", runtime.NumGoroutine())))
 
 }
 
@@ -114,13 +116,13 @@ func GET_Handling(w http.ResponseWriter, r *http.Request) {
 func ValidateConfig () {
     FoundError := false
     FileMap = make(map[string] string)
-    log.Info("Start check configuration file")
+    log.Info("Start check configuration file\n")
 
     _,err := ioutil.ReadDir(Conf.SoketDir)
     // Calculate full path
     // Fist validate soket dir path
     if err != nil {
-        log.Fatalf("Error %v",err)
+        log.Fatalf("Error %v\n",err)
     }
 
     // Check path fist start polling
@@ -135,9 +137,9 @@ func ValidateConfig () {
     }
 
     if !FoundError {
-        log.Info("Configuration correct, no error detect")
+        log.Info("Configuration correct, no error detect\n")
     } else {
-        log.Info("Error found check log")
+        log.Info("Error found check log\n")
     }
 }
 
@@ -161,7 +163,7 @@ func DeployPID() bool {
 
     pidFile,err := os.Open(Conf.PIDPath)
     if err != nil {
-        log.Fatalf("Impossible open file, %s\r\n", err)
+        log.Fatalf("Impossible open file, %s\n", err)
     }
 
     pidFile.WriteString(string(PID))
@@ -186,7 +188,7 @@ func main() {
         log.Fatal(err)
     }
 
-    log.Infof("Bin port:%d", Conf.Port)
+    log.Infof("Bin port:%d\n", Conf.Port)
     http.HandleFunc("/metrics", GET_Handling)
 
     http.Serve(l,nil)
