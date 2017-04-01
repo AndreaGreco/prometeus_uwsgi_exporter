@@ -128,7 +128,13 @@ func ValidateConfig () {
     // Check path fist start polling
     for _, SoketPath := range(Conf.StatsSokets) {
         // Calculate full path
-        FullPath := path.Join(Conf.SoketDir, SoketPath.Soket)
+        var FullPath string
+
+        if path.IsAbs(Conf.SoketDir) {
+            FullPath = Conf.SoketDir
+        } else {
+            FullPath = path.Join(Conf.SoketDir, SoketPath.Soket)
+        }
 
         if CheckUnixSoket(FullPath) {
             FoundError = true
@@ -188,7 +194,7 @@ func main() {
         log.Fatal(err)
     }
 
-    log.Infof("Bin port:%d\n", Conf.Port)
+    log.Infof("Bind port:%d\n", Conf.Port)
     http.HandleFunc("/metrics", GET_Handling)
 
     http.Serve(l,nil)
