@@ -1,4 +1,4 @@
-port: 9102
+port: 9238
 soket_dir: "/run/uwsgi/stats/"
 pidfile: "/run/uwsgi_expoter.pid"
 stats_sokets:

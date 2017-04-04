@@ -41,6 +41,8 @@ soket_dir: folder where is stored all stats soket.
 Than expoter will join soket_dir with soket
 In this example:
 All uWSGI stats soket are in /run/uwsgi/stats/, so uWSGI expoter will read, [your_soket_name.sock, other_soket_domain.sock]
+
+If you use full path both will use it without join.
 ``` yaml
 port:9237
 pidfile: "/run/uwsgi_expoter.pid"
