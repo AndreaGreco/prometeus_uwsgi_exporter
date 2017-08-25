@@ -12,7 +12,7 @@ import (
 
 // JSON Definition
 
-type Soket_t struct {
+type Socket_t struct {
 	Name       string `json:"name"`
 	Proto      string `json:"proto"`
 	Queue      int    `json:"queue"`
@@ -93,7 +93,7 @@ type Uwsgi_json_t struct {
 	Cwd               string           `json:"cwd"`
 	Locks             []map[string]int `json:"locks"`
 	Cache             []Caches_t       `json:"caches", omitempty`
-	Sockets           []Soket_t        `json:"sockets"`
+	Sockets           []Socket_t       `json:"sockets"`
 	Workers           []Worker_t       `json:"workers"`
 }
 
@@ -188,21 +188,21 @@ func uWSGI_DataFormat(data Uwsgi_json_t, domain string) string {
 		}
 	}
 
-	for iSoket, Socket := range data.Sockets {
-		txt := "sokets_queue"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Sokets queue\n", uwsgi_prefix, txt), (iSoket == 0))
+	for iSocket, Socket := range data.Sockets {
+		txt := "sockets_queue"
+		WriteHelp(fmt.Sprintf("# HELP %s%s Sockets queue\n", uwsgi_prefix, txt), (iSocket == 0))
 		WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n", uwsgi_prefix, txt, domain, Socket.Queue))
 
 		txt = "sockets_max_queue"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Max queue length\n", uwsgi_prefix, txt), (iSoket == 0))
+		WriteHelp(fmt.Sprintf("# HELP %s%s Max queue length\n", uwsgi_prefix, txt), (iSocket == 0))
 		WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n", uwsgi_prefix, txt, domain, Socket.MaxQueue))
 
 		txt = "sockets_shared"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Sockets shared\n", uwsgi_prefix, txt), (iSoket == 0))
+		WriteHelp(fmt.Sprintf("# HELP %s%s Sockets shared\n", uwsgi_prefix, txt), (iSocket == 0))
 		WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n", uwsgi_prefix, txt, domain, Socket.Shared))
 
 		txt = "sockets_can_off_load"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Sokets queue\n", uwsgi_prefix, txt), (iSoket == 0))
+		WriteHelp(fmt.Sprintf("# HELP %s%s Sockets queue\n", uwsgi_prefix, txt), (iSocket == 0))
 		WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n", uwsgi_prefix, txt, domain, Socket.CanOffload))
 	}
 
@@ -374,11 +374,11 @@ func ProvideJsonTextFile(path string) []byte {
 }
 
 /**
- * @brief Get json text from Unix Soket
+ * @brief Get json text from Unix Socket
  */
-func ProvideJsonTextFromUnixSoket(FullPath string) ([]byte, error) {
-	if CheckUnixSoket(FullPath) {
-		log.Errorf("Impossible open UnixSoket %s\r\n", FullPath)
+func ProvideJsonTextFromUnixSocket(FullPath string) ([]byte, error) {
+	if CheckUnixSocket(FullPath) {
+		log.Errorf("Impossible open UnixSocket %s\r\n", FullPath)
 		return nil, nil
 	}
 
@@ -399,15 +399,15 @@ type uWSGI_BufferCollector struct {
 }
 
 /**
- * @brief Perform reading of uwsgi stast soket
+ * @brief Perform reading of uwsgi stast socket
  */
-func ReadStatsSoket_uWSGI() []byte {
+func ReadStatsSocket_uWSGI() []byte {
 	/*
-	 * Worning, this function use go subroutine for parallel reading of soket.
+	 * Worning, this function use go subroutine for parallel reading of socket.
 	 * Function is splitted this part:
 	 * -   Create comunication channel
 	 * -   Create all go-routing with for loop
-	 * -   Read all unix soket
+	 * -   Read all unix socket
 	 * -   Concatenate string
 	 * -   close channel
 	 * This part is sheduled by internal go scheduler.
@@ -426,9 +426,9 @@ func ReadStatsSoket_uWSGI() []byte {
 		go func(FullPath string, CurretDomain string) {
 			Curret_uWSGI_Data := new(Uwsgi_json_t)
 
-			text, err := ProvideJsonTextFromUnixSoket(FullPath)
+			text, err := ProvideJsonTextFromUnixSocket(FullPath)
 			if err != nil {
-				log.Errorf("Cannot read soket:%v", err)
+				log.Errorf("Cannot read socket:%v", err)
 				wg.Done()
 				return
 			}

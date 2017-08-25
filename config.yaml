@@ -1,10 +1,10 @@
 port: 9238
-soket_dir: "/run/uwsgi/stats/"
+socket_dir: "/run/uwsgi/stats/"
 pidfile: "/run/uwsgi_expoter.pid"
-stats_sokets:
+stats_sockets:
 
 - domain: your.domain.com
-  soket: your_soket_name.sock
+  socket: your_socket_name.sock
 
 - domain: other-domain.com
-  soket: other_soket_domain.sock
+  socket: other_socket_domain.sock

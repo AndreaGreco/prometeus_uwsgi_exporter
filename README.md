@@ -37,23 +37,23 @@ WantedBy=multi-user.target
 Use as example config.yaml
 Fist 2 paramether is enougth clear.
 
-soket_dir: folder where is stored all stats soket.
-Than expoter will join soket_dir with soket
+socket_dir: folder where is stored all stats socket.
+Than expoter will join socket_dir with socket
 In this example:
-All uWSGI stats soket are in /run/uwsgi/stats/, so uWSGI expoter will read, [your_soket_name.sock, other_soket_domain.sock]
+All uWSGI stats socket are in /run/uwsgi/stats/, so uWSGI expoter will read, [your_socket_name.sock, other_socket_domain.sock]
 
 If you use full path both will use it without join.
 ``` yaml
 port:9237
 pidfile: "/run/uwsgi_expoter.pid"
 
-soket_dir: "/run/uwsgi/stats/"
-stats_sokets:
+socket_dir: "/run/uwsgi/stats/"
+stats_sockets:
 
 - domain: your.domain.com
-  soket: your_soket_name.sock
+  socket: your_socket_name.sock
 
 - domain: other-domain.com
-  soket: other_soket_domain.sock
+  socket: other_socket_domain.sock
 ```
 

@@ -13,16 +13,16 @@ import (
 	"runtime"
 )
 
-type StatsSoketConf_t struct {
+type StatsSocketConf_t struct {
 	Domain string `yaml:"domain"`
-	Soket  string `yaml:"soket"`
+	Socket string `yaml:"socket"`
 }
 
 type Config_t struct {
-	Port        int                `yaml:"port"`
-	SoketDir    string             `yaml:"soket_dir"`
-	PIDPath     string             `yaml:"pidfile"`
-	StatsSokets []StatsSoketConf_t `yaml:"stats_sokets"`
+	Port         int                 `yaml:"port"`
+	SocketDir    string              `yaml:"socket_dir"`
+	PIDPath      string              `yaml:"pidfile"`
+	StatsSockets []StatsSocketConf_t `yaml:"stats_sockets"`
 }
 
 // LOGGER
@@ -77,17 +77,17 @@ func ParseConfig() {
 }
 
 /**
- * @brief Check if unix soket exist, and if file is Unix Soket
+ * @brief Check if unix socket exist, and if file is Unix Socket
  *
  */
-func CheckUnixSoket(FullPath string) bool {
+func CheckUnixSocket(FullPath string) bool {
 	FoundError := false
 
 	// Check path exist
 	_, err := os.Stat(FullPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			/* Error is not fatal, soket could be removed, uWSGI restared, Then log it, and continue */
+			/* Error is not fatal, socket could be removed, uWSGI restared, Then log it, and continue */
 			log.Errorf("Could not open %s. This error is not critical will be SKIP\n", FullPath)
 			FoundError = true
 		} else {
@@ -105,7 +105,7 @@ func CheckUnixSoket(FullPath string) bool {
  * @brief callback handler GET request
  */
 func GET_Handling(w http.ResponseWriter, r *http.Request) {
-	w.Write(ReadStatsSoket_uWSGI())
+	w.Write(ReadStatsSocket_uWSGI())
 	w.Write([]byte(fmt.Sprintf("uwsgiexpoter_subroutine %d\n", runtime.NumGoroutine())))
 
 }
@@ -118,28 +118,30 @@ func ValidateConfig() {
 	FileMap = make(map[string]string)
 	log.Info("Start check configuration file\n")
 
-	_, err := ioutil.ReadDir(Conf.SoketDir)
+	_, err := ioutil.ReadDir(Conf.SocketDir)
 	// Calculate full path
-	// Fist validate soket dir path
+	// Fist validate socket dir path
 	if err != nil {
 		log.Fatalf("Error %v\n", err)
 	}
 
 	// Check path fist start polling
-	for _, SoketPath := range Conf.StatsSokets {
+	for _, SocketPath := range Conf.StatsSockets {
 		// Calculate full path
 		var FullPath string
-
-		if path.IsAbs(Conf.SoketDir) {
-			FullPath = Conf.SoketDir
+		// Check if path insert from user is abssolute.
+		// If absolute then don't join it with other path.
+		// it is just correct
+		if path.IsAbs(Conf.SocketDir) {
+			FullPath = Conf.SocketDir
 		} else {
-			FullPath = path.Join(Conf.SoketDir, SoketPath.Soket)
+			FullPath = path.Join(Conf.SocketDir, SocketPath.Socket)
 		}
 
-		if CheckUnixSoket(FullPath) {
+		if CheckUnixSocket(FullPath) {
 			FoundError = true
 		}
-		FileMap[SoketPath.Domain] = FullPath
+		FileMap[SocketPath.Domain] = FullPath
 	}
 
 	if !FoundError {
