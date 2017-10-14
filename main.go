@@ -72,7 +72,7 @@ func ParseConfig() {
 
 	err = yaml.Unmarshal([]byte(data), &Conf)
 	if err != nil {
-		log.Fatalf("Impossible read file:%s Error%v\n", *config_path, err)
+		log.Fatalf("Config file:%s Error, %v\n", *config_path, err)
 	}
 }
 
@@ -107,7 +107,6 @@ func CheckUnixSocket(FullPath string) bool {
 func GET_Handling(w http.ResponseWriter, r *http.Request) {
 	w.Write(ReadStatsSocket_uWSGI())
 	w.Write([]byte(fmt.Sprintf("uwsgiexpoter_subroutine %d\n", runtime.NumGoroutine())))
-
 }
 
 /**
@@ -118,9 +117,8 @@ func ValidateConfig() {
 	FileMap = make(map[string]string)
 	log.Info("Start check configuration file\n")
 
+	// Check if folder exist
 	_, err := ioutil.ReadDir(Conf.SocketDir)
-	// Calculate full path
-	// Fist validate socket dir path
 	if err != nil {
 		log.Fatalf("Error %v\n", err)
 	}
@@ -129,10 +127,8 @@ func ValidateConfig() {
 	for _, SocketPath := range Conf.StatsSockets {
 		// Calculate full path
 		var FullPath string
-		// Check if path insert from user is abssolute.
-		// If absolute then don't join it with other path.
-		// it is just correct
 		if path.IsAbs(Conf.SocketDir) {
+			// Support socket with absolute path
 			FullPath = Conf.SocketDir
 		} else {
 			FullPath = path.Join(Conf.SocketDir, SocketPath.Socket)
@@ -157,11 +153,6 @@ func ValidateConfig() {
  * Deploy pid file, Correct true, else false
  */
 func DeployPID() bool {
-	/**
-	 * TODO: Demonize
-	 * For do a good job this part must be demonizzed with double fork, write pid in /run/PIDNO
-	 * Find way to handle http with GIN or other lib to hangle reload, and restart signals
-	 */
 	if *noPID {
 		return true
 	}
