@@ -3,14 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/op/go-logging"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"path"
 	"runtime"
+
+	"github.com/op/go-logging"
+	"gopkg.in/yaml.v2"
 )
 
 type StatsSocketConf_t struct {
@@ -54,9 +55,24 @@ var config_path = flag.String("c", "config.yaml", "Path to a config file")
 var noPID = flag.Bool("n", false, "Not deploy PID file")
 
 /**
+ * Version flag, if true version will be printed
+ */
+var Version_flag = flag.Bool("v", false, "Version")
+
+/**
  * @brief Configuration struct
  */
 var Conf Config_t
+
+var VERSION_BUILD_GIT_HASH = "NOT SET"
+var VERSION_BUILD_GIT_VERSION = "NOT SET"
+var VERSION_BUILD_TIME = "NOT SET"
+
+func Print_Version() {
+	fmt.Printf("Git Version:\t%s\n", VERSION_BUILD_GIT_VERSION)
+	fmt.Printf("Build Time :\t%s\n", VERSION_BUILD_TIME)
+	fmt.Printf("Git Hash:\t%s\n", VERSION_BUILD_GIT_HASH)
+}
 
 /**
  * @brief Parse yaml config passed as flag parameter
@@ -178,6 +194,13 @@ func DeployPID() bool {
 func main() {
 	// Setup env
 	flag.Parse()
+
+	// If user is requesting version print it
+	if *Version_flag {
+		Print_Version()
+		return
+	}
+
 	ParseConfig()
 	SetUpLogger()
 	DeployPID()

@@ -164,10 +164,12 @@ func WriteMetrics(metrics string) {
  */
 func uWSGI_DataFormat(data Uwsgi_json_t, domain string) string {
 	StrBuilder.Reset()
+
 	/**
-	 * Try respect prometheus line guide for write expoter:
+	 * Try respect prometheus line guide for write exporter:
 	 * https://prometheus.io/docs/practices/naming/
 	 */
+
 	txt := "general_listen_queue"
 	WriteHelp(fmt.Sprintf("# HELP %s%s Length of uwsgi listen queue\n", uwsgi_prefix, txt), true)
 	WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\"} %d\n", uwsgi_prefix, txt, domain, data.ListenQueue))
@@ -435,7 +437,7 @@ func ReadStatsSocket_uWSGI() []byte {
 
 			err = json.Unmarshal(text, Curret_uWSGI_Data)
 			if err != nil {
-				log.Errorf("Cannol Unmarshal json:%v", err)
+				log.Errorf("Cannon Unmarshal json:%v", err)
 				wg.Done()
 				return
 			}
