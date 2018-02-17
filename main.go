@@ -63,7 +63,6 @@ var Conf Config_t
  * @return False if found error
  */
 func ParseConfig() {
-
 	data, err := ioutil.ReadFile(*config_path)
 
 	if err != nil {
@@ -127,16 +126,20 @@ func ValidateConfig() {
 	for _, SocketPath := range Conf.StatsSockets {
 		// Calculate full path
 		var FullPath string
-		if path.IsAbs(Conf.SocketDir) {
+
+		if path.IsAbs(SocketPath.Socket) {
 			// Support socket with absolute path
-			FullPath = Conf.SocketDir
+			FullPath = SocketPath.Socket
 		} else {
 			FullPath = path.Join(Conf.SocketDir, SocketPath.Socket)
 		}
 
+		log.Infof("Socket Path:%s", FullPath)
+
 		if CheckUnixSocket(FullPath) {
 			FoundError = true
 		}
+
 		FileMap[SocketPath.Domain] = FullPath
 	}
 
