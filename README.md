@@ -1,4 +1,4 @@
-# uWSGI expoter
+# uWSGI exporter
 
 ## Installation
 
@@ -32,7 +32,7 @@ ExecStart=/opt/prometheus_suite/uwsgi_expoter/uWSGI_expoter
 [Install]
 WantedBy=multi-user.target
 ```
-## Configure uWSGI expoter
+## Configure uWSGI exporter
 
 Use as example config.yaml
 Fist 2 paramether is enougth clear.
