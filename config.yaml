@@ -1,6 +1,6 @@
 port: 9238
 socket_dir: "/run/uwsgi/stats/"
-pidfile: "/run/uwsgi_expoter.pid"
+pidfile: "/run/uwsgi_exporter.pid"
 stats_sockets:
 
 - domain: your.domain.com
