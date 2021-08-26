@@ -2,8 +2,8 @@
 
 ## Installation
 
-You can install uWSGI expoter in system folder.
-Usually i use, /opt/prometheus/...
+You can install uWSGI exporter in system folder.
+Usually I use `/opt/prometheus/...`
 Then create relative SystemD unit.
 
 Create prometheus user, or run in your preferred user, nobody?.
@@ -35,17 +35,17 @@ WantedBy=multi-user.target
 ## Configure uWSGI exporter
 
 Use as example config.yaml
-Fist 2 paramether is enougth clear.
+First 2 paramether is clear enough.
 
-socket_dir: folder where is stored all stats socket.
-Than expoter will join socket_dir with socket
+`socket_dir`: folder where all stats sockets are stored.
+Then exporter will join `socket_dir` with `socket`
 In this example:
-All uWSGI stats socket are in /run/uwsgi/stats/, so uWSGI expoter will read, [your_socket_name.sock, other_socket_domain.sock]
+All uWSGI stats sockets are in `/run/uwsgi/stats/`, so uWSGI exporter will read, `[your_socket_name.sock, other_socket_domain.sock]`
 
 If you use full path both will use it without join.
 ``` yaml
 port:9237
-pidfile: "/run/uwsgi_expoter.pid"
+pidfile: "/run/uwsgi_exporter.pid"
 
 socket_dir: "/run/uwsgi/stats/"
 stats_sockets:
