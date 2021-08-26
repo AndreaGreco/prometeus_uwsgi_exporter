@@ -14,20 +14,20 @@ adduser prometheus --system --no-create-home --shell /sbin/nologin
 Systemd example file:
 ``` systemd
 [Unit]
-Description=uWSGI expoter
+Description=uWSGI exporter
 After=syslog.target
 
 [Service]
 Type=simple
 PermissionsStartOnly=true
 GuessMainPID=true
-WorkingDirectory=/opt/prometheus/uwsgi_expoter
+WorkingDirectory=/opt/prometheus/uwsgi_exporter
 
-PIDFile=/run/uwsgi_expoter.pid
-ExecStartPre=/bin/touch /run/uwsgi_expoter.pid
-ExecStartPre=/bin/chown prometheus:prometheus /run/uwsgi_expoter.pid
+PIDFile=/run/uwsgi_exporter.pid
+ExecStartPre=/bin/touch /run/uwsgi_exporter.pid
+ExecStartPre=/bin/chown prometheus:prometheus /run/uwsgi_exporter.pid
 
-ExecStart=/opt/prometheus_suite/uwsgi_expoter/uWSGI_expoter
+ExecStart=/opt/prometheus_suite/uwsgi_exporter/uWSGI_exporter
 
 [Install]
 WantedBy=multi-user.target
