@@ -121,7 +121,7 @@ func CheckUnixSocket(FullPath string) bool {
  */
 func GET_Handling(w http.ResponseWriter, r *http.Request) {
 	w.Write(ReadStatsSocket_uWSGI())
-	w.Write([]byte(fmt.Sprintf("uwsgiexpoter_subroutine %d\n", runtime.NumGoroutine())))
+	w.Write([]byte(fmt.Sprintf("uwsgiexporter_subroutine %d\n", runtime.NumGoroutine())))
 }
 
 /**

@@ -3,7 +3,7 @@
 export GOOS='linux'
 ALL_ARC=( "amd64" "386" "arm" "arm64" )
 
-NAME='uWSGI_expoter'
+NAME='uWSGI_exporter'
 VERSION=`git describe --abbrev=0 --tags`
 RELEASE_FOLDER="release"
 
