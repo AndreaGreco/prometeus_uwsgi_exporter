@@ -139,6 +139,7 @@ const uwsgi_prefix = "uwsgi_"
  */
 func SanitizeField(val string) string {
 	ret := strings.Replace(val, " ", "_", -1)
+	ret = strings.Replace(ret, "/", "_", -1)
 	ret = strings.ToLower(ret)
 	return ret
 }
@@ -287,7 +288,7 @@ func uWSGI_DataFormat(data Uwsgi_json_t, domain string) string {
 		WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n", uwsgi_prefix, txt, domain, iworker, Worker.Rss))
 
 		txt = "workers_vsz"
-		WriteHelp(fmt.Sprintf("# HELP %s%s Worker virtual memory sizen", uwsgi_prefix, txt), (iworker == 0))
+		WriteHelp(fmt.Sprintf("# HELP %s%s Worker virtual memory size\n", uwsgi_prefix, txt), (iworker == 0))
 		WriteMetrics(fmt.Sprintf("%s%s{domain=\"%s\", workerenum=\"%d\"} %d\n", uwsgi_prefix, txt, domain, iworker, Worker.Vsz))
 
 		txt = "workers_running_time"
